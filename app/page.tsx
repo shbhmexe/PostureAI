@@ -8,20 +8,28 @@ import { auth } from "@/lib/firebase-client";
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!auth) {
+      setLoading(false);
       return;
     }
     try {
       const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         setUser(currentUser);
+        setLoading(false);
       });
       return () => unsubscribe();
     } catch (err) {
       console.error(err);
+      setLoading(false);
     }
   }, []);
+
+  if (loading) {
+    return <div className="min-h-screen bg-slate-950" />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -36,7 +44,7 @@ export default function Home() {
           <div className="flex items-center gap-3">
             {user && (
               <button
-                className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200 hover:border-slate-500"
+                className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200 hover:border-slate-500 cursor-pointer"
                 onClick={() => {
                   if (auth) {
                     void signOut(auth);

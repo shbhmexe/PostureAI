@@ -160,6 +160,9 @@ export default function PostureApp({ user }: Props) {
       const registration = await navigator.serviceWorker.register(
         "/firebase-messaging-sw.js",
       );
+      // Ensure the service worker is ready before getting the token
+      await navigator.serviceWorker.ready;
+
       const token = await getToken(messaging, {
         vapidKey,
         serviceWorkerRegistration: registration,
@@ -199,15 +202,14 @@ export default function PostureApp({ user }: Props) {
                 </h3>
               </div>
               <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  snapshot?.status === "good"
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${snapshot?.status === "good"
                     ? "bg-emerald-500/15 text-emerald-300"
                     : snapshot?.status === "warning"
                       ? "bg-amber-500/15 text-amber-300"
                       : snapshot?.status === "bad"
                         ? "bg-rose-500/15 text-rose-300"
                         : "bg-slate-800 text-slate-300"
-                }`}
+                  }`}
               >
                 {snapshot?.status ?? "Idle"}
               </span>
@@ -318,7 +320,7 @@ export default function PostureApp({ user }: Props) {
               <p className="mt-3 text-xs text-rose-300">{pushError}</p>
             )}
             <button
-              className="mt-4 rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-4 rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               onClick={handleEnablePush}
               disabled={pushEnabled}
             >
@@ -400,13 +402,12 @@ function MetricCard({
         <span className="text-xs text-slate-400">{unit}</span>
       </div>
       <span
-        className={`mt-3 inline-flex rounded-full px-2 py-1 text-[10px] uppercase tracking-wide ${
-          status === "good"
+        className={`mt-3 inline-flex rounded-full px-2 py-1 text-[10px] uppercase tracking-wide ${status === "good"
             ? "bg-emerald-500/15 text-emerald-300"
             : status === "warn"
               ? "bg-amber-500/15 text-amber-300"
               : "bg-slate-800 text-slate-400"
-        }`}
+          }`}
       >
         {status === "good"
           ? "Aligned"

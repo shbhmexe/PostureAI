@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PostureAI
+
+PostureAI is a real-time, camera-based posture detection and health assistant built as a full-stack Next.js app. It uses TensorFlow.js to detect posture, Firebase Authentication for login, Firestore for posture session data, and Firebase Cloud Messaging for reminders.
+
+## Features
+
+- Real-time posture detection with MoveNet (TensorFlow.js)
+- Live posture status and instant on-screen alerts
+- Daily posture score + weekly analytics dashboard
+- Break reminders and push notification opt-in
+- Firebase Auth (email/password + Google)
+- Firestore session logging + analytics API routes
+
+## Tech Stack
+
+- Next.js (App Router) + TypeScript + Tailwind CSS
+- TensorFlow.js + MoveNet pose detection
+- Firebase Auth + Firestore + Cloud Messaging
 
 ## Getting Started
 
-First, run the development server:
+Install dependencies and run the dev server:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000` in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create a `.env.local` file in the project root:
 
-## Learn More
+```bash
+NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+NEXT_PUBLIC_FIREBASE_VAPID_KEY=your_web_push_vapid_key
 
-To learn more about Next.js, take a look at the following resources:
+FIREBASE_PROJECT_ID=your_project_id
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account","project_id":"...","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----\\n","client_email":"...","client_id":"...","auth_uri":"...","token_uri":"...","auth_provider_x509_cert_url":"...","client_x509_cert_url":"..."}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> Note: `FIREBASE_SERVICE_ACCOUNT` is a JSON string. Escape newlines in the private key as `\\n`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Firebase Messaging Service Worker
 
-## Deploy on Vercel
+The service worker is served dynamically at `/firebase-messaging-sw.js` using your environment variables. No hardcoded keys are stored in the repo. Ensure the `NEXT_PUBLIC_FIREBASE_*` values are set and restart the dev server.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## API Routes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `POST /api/session` — store posture snapshots
+- `GET /api/analytics?uid=` — weekly posture analytics
+- `POST /api/notifications` — save FCM tokens
+
+## Deployment
+
+Deploy to Firebase Hosting or Google Cloud Run:
+
+1. Build the app: `npm run build`
+2. Configure Firebase Hosting or Cloud Run with environment variables.
+3. Ensure the service account credentials are available in production.
+
+## Roadmap
+
+- Mobile app companion
+- AI-based posture correction exercises
+- Corporate team dashboards
+- Wearable/smart chair integrations

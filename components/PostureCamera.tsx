@@ -18,6 +18,8 @@ export default function PostureCamera({ onSnapshot }: Props) {
   const [statusText, setStatusText] = useState("Initializing model...");
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isActive, setIsActive] = useState(true);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -25,7 +27,34 @@ export default function PostureCamera({ onSnapshot }: Props) {
     let detector: import("@tensorflow-models/pose-detection").PoseDetector | null =
       null;
 
+    const cleanup = () => {
+      isMounted = false;
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      detector?.dispose();
+    };
+
     const setup = async () => {
+      if (!isActive) {
+        cleanup();
+        setReady(false);
+        setStatusText("Camera Paused");
+        if (canvasRef.current) {
+          const ctx = canvasRef.current.getContext("2d");
+          ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+        return;
+      }
+
       try {
         const tf = await import("@tensorflow/tfjs");
         await import("@tensorflow/tfjs-backend-webgl");
@@ -57,6 +86,7 @@ export default function PostureCamera({ onSnapshot }: Props) {
           },
           audio: false,
         });
+        streamRef.current = stream;
 
         if (!videoRef.current) {
           return;
@@ -153,41 +183,54 @@ export default function PostureCamera({ onSnapshot }: Props) {
 
     void setup();
 
-    return () => {
-      isMounted = false;
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
-      detector?.dispose();
-    };
-  }, [onSnapshot]);
+    return cleanup;
+  }, [onSnapshot, isActive]);
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60">
-      <div className="absolute left-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700 backdrop-blur-sm dark:bg-slate-950/80 dark:text-slate-200">
-        {ready ? "Live" : "Loading"}
+      <div className="absolute left-4 top-4 z-10 flex gap-2">
+        <div className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide backdrop-blur-sm ${isActive && ready ? "bg-emerald-500/90 text-white" : "bg-white/80 text-slate-700 dark:bg-slate-950/80 dark:text-slate-200"}`}>
+          {isActive ? (ready ? "Live" : "Loading") : "Off"}
+        </div>
       </div>
-      <div className="absolute right-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-xs text-slate-600 backdrop-blur-sm dark:bg-slate-950/80 dark:text-slate-300">
+
+      <button
+        onClick={() => setIsActive(!isActive)}
+        className="absolute right-4 top-4 z-20 rounded-full bg-slate-900/50 p-2 text-white transition-colors hover:bg-slate-900/80 backdrop-blur-sm"
+        title={isActive ? "Turn Camera Off" : "Turn Camera On"}
+      >
+        {isActive ? (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-video-off"><path d="M10.66 6H14a2 2 0 0 1 2 2v2.5l5.248-3.062A.5.5 0 0 1 22 7.87v8.196a.5.5 0 0 1-.752.435L16 13.5V16a2 2 0 0 1-2 2h-4.25" /><path d="m2 2 20 20" /></svg>
+        ) : (
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-video"><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" ry="2" /></svg>
+        )}
+      </button>
+
+      <div className="absolute left-1/2 top-4 -translate-x-1/2 z-10 rounded-full bg-white/80 px-3 py-1 text-xs text-slate-600 backdrop-blur-sm dark:bg-slate-950/80 dark:text-slate-300">
         {statusText}
       </div>
+
       {error ? (
         <div className="flex min-h-[420px] items-center justify-center px-6 py-20 text-center text-sm text-rose-600 dark:text-rose-200">
           {error}
         </div>
       ) : (
-        <div className="relative">
+        <div className="relative h-[420px] bg-slate-200 dark:bg-slate-900 flex items-center justify-center">
+          {!isActive && (
+            <div className="flex flex-col items-center gap-3 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-camera-off"><path d="m2 2 20 20" /><path d="M7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16" /><path d="M9.5 4h5L17 7h3a2 2 0 0 1 2 2v7.5" /><path d="M14.121 15.121A3 3 0 1 1 9.88 10.88" /></svg>
+              <span className="text-sm">Camera is turned off</span>
+            </div>
+          )}
           <video
             ref={videoRef}
-            className="h-[420px] w-full object-cover"
+            className={`absolute h-full w-full object-cover transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0'}`}
             playsInline
             muted
           />
           <canvas
             ref={canvasRef}
-            className="pointer-events-none absolute inset-0 h-full w-full"
+            className={`pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-300 ${isActive ? 'opacity-100' : 'opacity-0'}`}
           />
         </div>
       )}

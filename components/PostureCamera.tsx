@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PostureSnapshot } from "@/types/posture";
 import { calculatePostureMetrics, evaluatePosture } from "@/lib/posture";
+import { calculatePoseBasedMetrics, resetMetricsSession } from "@/lib/pose-metrics";
 
 type Props = {
   onSnapshot: (snapshot: PostureSnapshot) => void;
@@ -35,6 +36,9 @@ export default function PostureCamera({ onSnapshot }: Props) {
         await tf.setBackend("webgl");
         await tf.ready();
 
+        // Reset metrics session on camera start
+        resetMetricsSession();
+
         detector = await poseDetection.createDetector(
           poseDetection.SupportedModels.MoveNet,
           {
@@ -43,6 +47,7 @@ export default function PostureCamera({ onSnapshot }: Props) {
             enableSmoothing: true,
           },
         );
+
 
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -78,12 +83,14 @@ export default function PostureCamera({ onSnapshot }: Props) {
         setReady(true);
         setStatusText("Analyzing posture...");
 
+        let prevFaceMetrics: any = null;
+
         const render = async () => {
           if (!videoRef.current || !detector) {
             return;
           }
           const now = performance.now();
-          if (now - lastFrameRef.current < 100) {
+          if (now - lastFrameRef.current < 80) {
             rafRef.current = requestAnimationFrame(render);
             return;
           }
@@ -93,17 +100,29 @@ export default function PostureCamera({ onSnapshot }: Props) {
             maxPoses: 1,
             flipHorizontal: true,
           });
+
           const pose = poses[0];
+
           if (pose) {
             const metrics = calculatePostureMetrics(pose);
             if (metrics) {
               const evaluation = evaluatePosture(metrics);
+
+              // Use pose-based metrics (reliable alternative to face mesh)
+              const faceMetrics = calculatePoseBasedMetrics(pose, prevFaceMetrics);
+              if (faceMetrics) {
+                prevFaceMetrics = faceMetrics;
+              }
+
               const snapshot: PostureSnapshot = {
                 metrics,
+                faceMetrics: faceMetrics || prevFaceMetrics,
+                rawPose: pose,
                 ...evaluation,
                 timestamp: Date.now(),
               };
-              if (now - lastEmitRef.current > 200) {
+
+              if (now - lastEmitRef.current > 150) {
                 onSnapshot(snapshot);
                 lastEmitRef.current = now;
               }
@@ -147,15 +166,15 @@ export default function PostureCamera({ onSnapshot }: Props) {
   }, [onSnapshot]);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/60">
-      <div className="absolute left-4 top-4 z-10 rounded-full bg-slate-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-200">
+    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60">
+      <div className="absolute left-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-700 backdrop-blur-sm dark:bg-slate-950/80 dark:text-slate-200">
         {ready ? "Live" : "Loading"}
       </div>
-      <div className="absolute right-4 top-4 z-10 rounded-full bg-slate-950/80 px-3 py-1 text-xs text-slate-300">
+      <div className="absolute right-4 top-4 z-10 rounded-full bg-white/80 px-3 py-1 text-xs text-slate-600 backdrop-blur-sm dark:bg-slate-950/80 dark:text-slate-300">
         {statusText}
       </div>
       {error ? (
-        <div className="flex min-h-[380px] items-center justify-center px-6 py-20 text-center text-sm text-rose-200">
+        <div className="flex min-h-[420px] items-center justify-center px-6 py-20 text-center text-sm text-rose-600 dark:text-rose-200">
           {error}
         </div>
       ) : (
@@ -177,7 +196,7 @@ export default function PostureCamera({ onSnapshot }: Props) {
 }
 
 function drawOverlay(
-  pose: import("@tensorflow-models/pose-detection").Pose,
+  pose: any,
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement | null,
 ) {
@@ -198,15 +217,16 @@ function drawOverlay(
 
   ctx.clearRect(0, 0, width, height);
 
+  // Draw Pose Keypoints
   const keypoints = pose.keypoints.filter(
-    (point) => (point.score ?? 0) > 0.4,
+    (point: any) => (point.score ?? 0) > 0.4,
   );
 
   ctx.strokeStyle = "rgba(59, 130, 246, 0.8)";
   ctx.lineWidth = 3;
   ctx.fillStyle = "rgba(96, 165, 250, 0.9)";
 
-  keypoints.forEach((point) => {
+  keypoints.forEach((point: any) => {
     ctx.beginPath();
     ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
     ctx.fill();
@@ -223,11 +243,11 @@ function drawOverlay(
 
   connections.forEach(([a, b]) => {
     const start =
-      keypoints.find((point) => point.name === a) ??
-      keypoints.find((point) => (point as { part?: string }).part === a);
+      keypoints.find((point: any) => point.name === a) ??
+      keypoints.find((point: any) => (point as { part?: string }).part === a);
     const end =
-      keypoints.find((point) => point.name === b) ??
-      keypoints.find((point) => (point as { part?: string }).part === b);
+      keypoints.find((point: any) => point.name === b) ??
+      keypoints.find((point: any) => (point as { part?: string }).part === b);
     if (!start || !end) return;
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
@@ -235,3 +255,4 @@ function drawOverlay(
     ctx.stroke();
   });
 }
+

@@ -8,11 +8,11 @@ type Props = {
 
 export default function WeeklyChart({ data }: Props) {
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+    <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-900/60">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-slate-400">Weekly posture score</p>
-          <p className="text-lg font-semibold text-slate-100">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Weekly posture score</p>
+          <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
             {data.length ? "Last 7 days" : "No data yet"}
           </p>
         </div>
@@ -28,19 +28,18 @@ export default function WeeklyChart({ data }: Props) {
             <div key={item.date} className="flex flex-1 flex-col items-center gap-2">
               <div className="flex h-28 w-full items-end">
                 <div
-                  className={`w-full rounded-full ${
-                    !hasScore
-                      ? "bg-slate-800"
+                  className={`w-full rounded-full ${!hasScore
+                      ? "bg-slate-200 dark:bg-slate-800"
                       : score > 80
                         ? "bg-emerald-500/80"
                         : score > 60
                           ? "bg-amber-500/80"
                           : "bg-rose-500/80"
-                  }`}
+                    }`}
                   style={{ height: `${height}%` }}
                 />
               </div>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 {formatDay(item.date)}
               </span>
             </div>

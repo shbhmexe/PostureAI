@@ -3,15 +3,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { User } from "firebase/auth";
 import { getToken } from "firebase/messaging";
-import PostureCamera from "@/components/PostureCamera";
+import dynamic from "next/dynamic";
+
+const PostureCamera = dynamic(() => import("@/components/PostureCamera"), {
+  ssr: false,
+});
+const PostureMirror = dynamic(() => import("@/components/PostureMirror"), {
+  ssr: false,
+});
+
 import WeeklyChart from "@/components/WeeklyChart";
 import { getMessagingIfSupported } from "@/lib/firebase-client";
 import { getThresholds } from "@/lib/posture";
 import type {
   AnalyticsSummary,
+  FaceMetrics,
   PostureSnapshot,
   PostureStatus,
 } from "@/types/posture";
+import { Eye, Brain, Activity, Clock } from "lucide-react";
 
 type Props = {
   user: User;
@@ -20,14 +30,16 @@ type Props = {
 type AlertItem = {
   id: string;
   message: string;
-  severity: PostureStatus;
+  severity: PostureStatus | "info";
   timestamp: number;
 };
 
 const BREAK_INTERVAL_MS = 45 * 60 * 1000;
+const BLINK_REMINDER_INTERVAL = 20 * 60 * 1000; // 20-20-20 Rule
 
 export default function PostureApp({ user }: Props) {
   const [snapshot, setSnapshot] = useState<PostureSnapshot | null>(null);
+  const [persistentFaceMetrics, setPersistentFaceMetrics] = useState<FaceMetrics | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsSummary>({
     daily: [],
@@ -41,6 +53,7 @@ export default function PostureApp({ user }: Props) {
 
   const latestSnapshotRef = useRef<PostureSnapshot | null>(null);
   const lastStatusRef = useRef<PostureStatus>("unknown");
+  const lastBlinkAlertRef = useRef<number>(Date.now());
   const sessionIdRef = useRef<string>("");
   const sessionStartRef = useRef(0);
   const [sessionIdDisplay, setSessionIdDisplay] = useState("--");
@@ -49,6 +62,27 @@ export default function PostureApp({ user }: Props) {
 
   useEffect(() => {
     latestSnapshotRef.current = snapshot;
+
+    if (snapshot?.faceMetrics) {
+      setPersistentFaceMetrics(snapshot.faceMetrics);
+    }
+
+    // Eye Health Logic: Check if blink rate is low or if 20 mins passed
+    const now = Date.now();
+    if (snapshot?.faceMetrics && now - lastBlinkAlertRef.current > BLINK_REMINDER_INTERVAL) {
+      if (snapshot.faceMetrics.blinkRate < 5) {
+        setAlerts(prev => [
+          {
+            id: `blink-${now}`,
+            message: "Eye Health: Blink more often to reduce strain!",
+            severity: "info" as "info",
+            timestamp: now,
+          } as AlertItem,
+          ...prev,
+        ].slice(0, 5));
+        lastBlinkAlertRef.current = now;
+      }
+    }
   }, [snapshot]);
 
   useEffect(() => {
@@ -73,9 +107,9 @@ export default function PostureApp({ user }: Props) {
         {
           id: `${snapshot.timestamp}-${snapshot.status}`,
           message: snapshot.issues[0] ?? "Adjust your posture",
-          severity: snapshot.status,
+          severity: snapshot.status as PostureStatus,
           timestamp: snapshot.timestamp,
-        },
+        } as AlertItem,
         ...prev,
       ].slice(0, 5));
     }
@@ -187,192 +221,125 @@ export default function PostureApp({ user }: Props) {
   const todayScore = snapshot?.score ?? analytics.daily.at(-1)?.score ?? 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
+      {/* 3D Mirror & Camera Row */}
+      <section className="grid gap-6 lg:grid-cols-2">
+        <PostureCamera onSnapshot={setSnapshot} />
+        <div className="relative">
+          <PostureMirror pose={snapshot?.rawPose} />
+          {snapshot?.faceMetrics?.isBlinking && (
+            <div className="absolute right-4 top-4 rounded-full bg-sky-500/20 px-3 py-1 text-[10px] font-bold text-sky-400 backdrop-blur-sm">
+              BLINK DETECTED
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Advanced AI Metrics Section */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/60 transition-all hover:bg-slate-50 dark:hover:bg-slate-900/80">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-sky-500/10 p-2 text-sky-500">
+              <Brain className="h-5 w-5" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Focus Score</p>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold">{persistentFaceMetrics?.focusScore ?? "--"}</span>
+            <span className="text-xs text-slate-400">/ 100</span>
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500">AI analysis of head orientation & attention</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/60 transition-all hover:bg-slate-50 dark:hover:bg-slate-900/80">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-rose-500/10 p-2 text-rose-500">
+              <Activity className="h-5 w-5" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Stress Level</p>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold">{persistentFaceMetrics?.stressLevel ?? "--"}%</span>
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500">Based on blink patterns & stiffness</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/60 transition-all hover:bg-slate-50 dark:hover:bg-slate-900/80">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-500">
+              <Eye className="h-5 w-5" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Eye Strain</p>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold">{(persistentFaceMetrics?.eyeOpenness ?? 0).toFixed(2)}</span>
+            <span className="text-xs text-slate-400">EAR</span>
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500">20-20-20 rule tracking active</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/60 transition-all hover:bg-slate-50 dark:hover:bg-slate-900/80">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-amber-500/10 p-2 text-amber-500">
+              <Clock className="h-5 w-5" />
+            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Blink Rate</p>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold">{persistentFaceMetrics?.blinkRate ?? "--"}</span>
+            <span className="text-xs text-slate-400">/ session</span>
+          </div>
+          <p className="mt-2 text-[10px] text-slate-500">Averages 15-20 blinks/min for healthy eyes</p>
+        </div>
+      </section>
+
+      {/* Existing Metrics & Chart Section */}
       <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-4">
-          <PostureCamera onSnapshot={setSnapshot} />
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
+          <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                  Live posture metrics
-                </p>
-                <h3 className="mt-2 text-lg font-semibold text-white">
-                  Spine, neck, and shoulder alignment
-                </h3>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live posture metrics</p>
+                <h3 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">Alignment Overview</h3>
               </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${snapshot?.status === "good"
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : snapshot?.status === "warning"
-                      ? "bg-amber-500/15 text-amber-300"
-                      : snapshot?.status === "bad"
-                        ? "bg-rose-500/15 text-rose-300"
-                        : "bg-slate-800 text-slate-300"
-                  }`}
-              >
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${snapshot?.status === "good" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
+                snapshot?.status === "warning" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300" :
+                  snapshot?.status === "bad" ? "bg-rose-500/15 text-rose-600 dark:text-rose-300" :
+                    "bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                }`}>
                 {snapshot?.status ?? "Idle"}
               </span>
             </div>
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
-              <MetricCard
-                label="Spine angle"
-                value={snapshot?.metrics.spineAngle}
-                threshold={thresholds.spine.warn}
-                unit="°"
-              />
-              <MetricCard
-                label="Neck tilt"
-                value={snapshot?.metrics.neckTilt}
-                threshold={thresholds.neck.warn}
-                unit="°"
-              />
-              <MetricCard
-                label="Shoulder tilt"
-                value={snapshot?.metrics.shoulderTilt}
-                threshold={thresholds.shoulder.warn}
-                unit="°"
-              />
-            </div>
-            <div className="mt-6 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-              <span>Confidence: {(snapshot?.metrics.confidence ?? 0).toFixed(2)}</span>
-              <span>Session ID: {sessionIdDisplay}</span>
+              <MetricCard label="Spine angle" value={snapshot?.metrics.spineAngle} threshold={thresholds.spine.warn} unit="°" />
+              <MetricCard label="Neck tilt" value={snapshot?.metrics.neckTilt} threshold={thresholds.neck.warn} unit="°" />
+              <MetricCard label="Shoulder tilt" value={snapshot?.metrics.shoulderTilt} threshold={thresholds.shoulder.warn} unit="°" />
             </div>
           </div>
+          <WeeklyChart data={analytics.daily} />
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-              Instant alerts
-            </p>
-            <h3 className="mt-2 text-lg font-semibold text-white">
-              {snapshot?.status === "bad"
-                ? "Please reset your posture"
-                : snapshot?.status === "warning"
-                  ? "Minor posture drift"
-                  : "You are aligned"}
-            </h3>
-            <p className="mt-2 text-sm text-slate-400">
-              {snapshot?.issues?.[0] ??
-                "Sit tall, relax shoulders, and align ears over shoulders."}
-            </p>
+          <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-6 dark:border-slate-800 dark:bg-slate-900/60 h-full">
+            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Live Health Stream</p>
             <div className="mt-4 space-y-3">
               {alerts.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  Alerts will appear here when posture slips.
-                </p>
+                <p className="text-xs text-slate-400">All systems optimal. Keep it up!</p>
               ) : (
                 alerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-xs text-slate-300"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span>{alert.message}</span>
-                      <span className="text-[10px] text-slate-500">
-                        {new Date(alert.timestamp).toLocaleTimeString()}
-                      </span>
+                  <div key={alert.id} className={`rounded-xl border p-4 text-xs transition-colors ${alert.severity === "bad" ? "border-rose-100 bg-rose-50/50 text-rose-900 dark:border-rose-900/30 dark:bg-rose-900/10 dark:text-rose-400" :
+                    alert.severity === "warning" ? "border-amber-100 bg-amber-50/50 text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-400" :
+                      "border-sky-100 bg-sky-50/50 text-sky-900 dark:border-sky-900/30 dark:bg-sky-900/10 dark:text-sky-400"
+                    }`}>
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="uppercase tracking-wider">{alert.severity === "info" ? "Health Tip" : "Posture Alert"}</span>
+                      <span>{new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
+                    <p className="mt-1 font-medium">{alert.message}</p>
                   </div>
                 ))
               )}
             </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-              Break reminders
-            </p>
-            <h3 className="mt-2 text-lg font-semibold text-white">
-              {breakDue ? "Time to stretch" : "Next break in ~45 min"}
-            </h3>
-            <p className="mt-2 text-sm text-slate-400">
-              {breakDue
-                ? "Stand up, roll your shoulders, and reset your posture."
-                : "We’ll nudge you to move before fatigue builds up."}
-            </p>
-            {breakDue && (
-              <button
-                className="mt-4 rounded-xl border border-slate-700 px-4 py-2 text-xs text-slate-200 hover:border-slate-500"
-                onClick={() => {
-                  sessionStartRef.current = Date.now();
-                  setBreakDue(false);
-                }}
-              >
-                Reset break timer
-              </button>
-            )}
-          </div>
-
-          <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-              Notifications
-            </p>
-            <h3 className="mt-2 text-lg font-semibold text-white">
-              Push reminders
-            </h3>
-            <p className="mt-2 text-sm text-slate-400">
-              Enable web notifications to get posture nudges when you’re
-              away from the tab.
-            </p>
-            {pushError && (
-              <p className="mt-3 text-xs text-rose-300">{pushError}</p>
-            )}
-            <button
-              className="mt-4 rounded-xl bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
-              onClick={handleEnablePush}
-              disabled={pushEnabled}
-            >
-              {pushEnabled ? "Enabled" : "Enable reminders"}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[1fr_1.4fr_1fr]">
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-            Daily posture score
-          </p>
-          <div className="mt-4 flex items-end gap-3">
-            <span className="text-4xl font-semibold text-white">
-              {todayScore}
-            </span>
-            <span className="text-xs text-slate-500">/ 100</span>
-          </div>
-          <p className="mt-3 text-sm text-slate-400">
-            Based on real-time spine, neck, and shoulder alignment.
-          </p>
-          <div className="mt-5 h-2 w-full rounded-full bg-slate-800">
-            <div
-              className="h-2 rounded-full bg-blue-500"
-              style={{ width: `${todayScore}%` }}
-            />
-          </div>
-        </div>
-
-        <WeeklyChart data={analytics.daily} />
-
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
-          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-            Insights
-          </p>
-          <h3 className="mt-2 text-lg font-semibold text-white">
-            {analyticsLoading
-              ? "Loading analytics..."
-              : analytics.weekAverage
-                ? `Weekly average: ${analytics.weekAverage}`
-                : "Start a posture session"}
-          </h3>
-          <p className="mt-2 text-sm text-slate-400">
-            {analytics.totalSamples
-              ? `${analytics.totalSamples} posture samples logged this week.`
-              : "Your analytics dashboard will populate as you use PostureAI."}
-          </p>
-          <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-xs text-slate-300">
-            Premium: deep posture history, personalized coaching, and team
-            dashboards.
           </div>
         </div>
       </section>
@@ -395,25 +362,17 @@ function MetricCard({
   const display = hasValue ? value.toFixed(1) : "--";
   const status = !hasValue ? "idle" : value > threshold ? "warn" : "good";
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/60">
       <p className="text-xs text-slate-500">{label}</p>
       <div className="mt-2 flex items-end gap-2">
-        <span className="text-2xl font-semibold text-white">{display}</span>
-        <span className="text-xs text-slate-400">{unit}</span>
+        <span className="text-2xl font-semibold text-slate-900 dark:text-white">{display}</span>
+        <span className="text-xs text-slate-500 dark:text-slate-400">{unit}</span>
       </div>
-      <span
-        className={`mt-3 inline-flex rounded-full px-2 py-1 text-[10px] uppercase tracking-wide ${status === "good"
-            ? "bg-emerald-500/15 text-emerald-300"
-            : status === "warn"
-              ? "bg-amber-500/15 text-amber-300"
-              : "bg-slate-800 text-slate-400"
-          }`}
-      >
-        {status === "good"
-          ? "Aligned"
-          : status === "warn"
-            ? "Adjust"
-            : "Idle"}
+      <span className={`mt-3 inline-flex rounded-full px-2 py-1 text-[10px] uppercase tracking-wide ${status === "good" ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300" :
+        status === "warn" ? "bg-amber-500/15 text-amber-600 dark:text-amber-300" :
+          "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+        }`}>
+        {status === "good" ? "Aligned" : status === "warn" ? "Adjust" : "Idle"}
       </span>
     </div>
   );

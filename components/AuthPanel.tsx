@@ -57,14 +57,14 @@ export default function AuthPanel() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-8">
+      <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-8 dark:border-slate-800 dark:bg-slate-900/60">
         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
           Welcome back
         </p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">
+        <h1 className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">
           Sign in to PostureAI
         </h1>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           Track real-time posture, reduce pain, and unlock healthy work habits.
         </p>
 
@@ -77,11 +77,11 @@ export default function AuthPanel() {
 
         <div className="mt-6 space-y-4">
           <div className="grid gap-2">
-            <label className="text-xs font-medium text-slate-400">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Email
             </label>
             <input
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               placeholder="you@company.com"
               type="email"
               value={email}
@@ -89,11 +89,11 @@ export default function AuthPanel() {
             />
           </div>
           <div className="grid gap-2">
-            <label className="text-xs font-medium text-slate-400">
+            <label className="text-xs font-medium text-slate-500 dark:text-slate-400">
               Password
             </label>
             <input
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-blue-500"
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               placeholder="••••••••"
               type="password"
               value={password}
@@ -108,14 +108,14 @@ export default function AuthPanel() {
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button
-            className="flex-1 rounded-xl bg-blue-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-500 dark:hover:bg-blue-600"
             onClick={handleEmailAuth}
             disabled={loading}
           >
             {mode === "signup" ? "Create account" : "Sign in"}
           </button>
           <button
-            className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-500"
             onClick={handleGoogleAuth}
             disabled={loading}
           >
@@ -135,21 +135,21 @@ export default function AuthPanel() {
         </button>
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900/80 to-slate-950 p-8">
-        <h2 className="text-lg font-semibold text-white">
+      <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-100 via-slate-50 to-white p-8 dark:border-slate-800 dark:from-slate-900 dark:via-slate-900/80 dark:to-slate-950">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
           PostureAI for focused teams
         </h2>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
           Real-time posture detection with instant alerts, daily posture
           scores, and weekly insights for students and professionals.
         </p>
-        <ul className="mt-6 space-y-3 text-sm text-slate-300">
+        <ul className="mt-6 space-y-3 text-sm text-slate-700 dark:text-slate-300">
           <li>✓ Live camera posture analysis with MoveNet</li>
           <li>✓ On-screen alerts & break reminders</li>
           <li>✓ Daily posture score & weekly analytics</li>
           <li>✓ Ready for team dashboards and B2B rollout</li>
         </ul>
-        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-xs text-slate-400">
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-white/70 p-4 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-400">
           Free includes live alerts + daily score. Premium unlocks posture
           history, personalized coaching, and team analytics.
         </div>
